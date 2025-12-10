@@ -14,9 +14,12 @@ import {
   SectionList,
   KeyboardAvoidingView,
   Keyboard,
-  ListRenderItem
+  Image,
 } from 'react-native';
+import type { ListRenderItem } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient'; 
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'; // CRITICAL IMPORTS
 
 // --- Types & Interfaces ---
 interface Destination {
@@ -33,11 +36,18 @@ interface SectionData {
 }
 
 // --- Constants ---
-const STORAGE_KEY = 'tour_planner_data_ts_v3';
+const STORAGE_KEY = 'tour_planner_data_ts_v4'; // Using v4 to ensure fresh start
 const MAX_SELECTION = 2;
 
-export default function TourPlannerScreen() {
+// --- Main Logic Component (Consumes insets) ---
+function MainAppContent() {
+  // Use the hook to get dynamic safe area heights
+  const insets = useSafeAreaInsets();
+  
   // --- State ---
+  // FIX: Declaring the intro state here
+  const [showIntro, setShowIntro] = useState<boolean>(true);
+  
   const [destinations, setDestinations] = useState<Destination[]>([
     { id: '1', name: "Ajodhya Hill Top", day: 1, completed: false, selectedForDistance: false },
     { id: '2', name: "Mayur Pahar", day: 1, completed: false, selectedForDistance: false },
@@ -69,7 +79,15 @@ export default function TourPlannerScreen() {
   const [warningMsg, setWarningMsg] = useState<string | null>(null);
   const [isReady, setIsReady] = useState<boolean>(false);
 
-  // --- Effects ---
+  // --- Intro Effect ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowIntro(false);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // --- Data Loading Effects ---
   useEffect(() => {
     loadState();
   }, []);
@@ -102,7 +120,7 @@ export default function TourPlannerScreen() {
     }
   };
 
-  // --- Helpers ---
+  // --- Helpers & Actions ---
   const getSelected = () => destinations.filter(d => d.selectedForDistance);
 
   const showWarning = (msg: string) => {
@@ -110,7 +128,6 @@ export default function TourPlannerScreen() {
     setTimeout(() => setWarningMsg(null), 3000);
   };
 
-  // --- Actions ---
   const toggleComplete = (id: string) => {
     setDestinations(prev => prev.map(d => 
       d.id === id ? { ...d, completed: !d.completed } : d
@@ -120,14 +137,11 @@ export default function TourPlannerScreen() {
   const toggleSelection = (id: string) => {
     const dest = destinations.find(d => d.id === id);
     if (!dest) return;
-
     const selectedCount = getSelected().length;
-
     if (!dest.selectedForDistance && selectedCount >= MAX_SELECTION) {
       showWarning("Max 2 locations for distance");
       return;
     }
-
     setDestinations(prev => prev.map(d => 
       d.id === id ? { ...d, selectedForDistance: !d.selectedForDistance } : d
     ));
@@ -140,14 +154,12 @@ export default function TourPlannerScreen() {
       const d2 = encodeURIComponent(selected[1].name);
       const url = `https://www.google.com/maps/dir/${d1}/${d2}`;
       Linking.openURL(url);
-      
       setDestinations(prev => prev.map(d => ({...d, selectedForDistance: false})));
     }
   };
 
   const addNewDestination = () => {
     const maxDay = destinations.length > 0 ? Math.max(...destinations.map(d => d.day || 1)) : 1;
-    
     const newDest: Destination = {
       id: Date.now().toString(),
       name: "",
@@ -173,17 +185,15 @@ export default function TourPlannerScreen() {
     ]);
   };
 
-  // --- Data Prep for SectionList ---
+  // --- Data Prep ---
   const sections: SectionData[] = useMemo(() => {
     const sorted = [...destinations].sort((a, b) => (a.day || 0) - (b.day || 0));
-    
     const grouped: { [key: number]: Destination[] } = {};
     sorted.forEach(d => {
       const day = d.day || 1;
       if (!grouped[day]) grouped[day] = [];
       grouped[day].push(d);
     });
-
     return Object.keys(grouped).map(day => ({
       title: `Day ${day}`,
       data: grouped[parseInt(day)]
@@ -201,12 +211,10 @@ export default function TourPlannerScreen() {
         <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
           {item.completed && <Text style={styles.checkmark}>✓</Text>}
         </View>
-        
         <Text style={[styles.itemText, item.completed && styles.itemTextCompleted]}>
           {item.name}
         </Text>
       </View>
-
       <TouchableOpacity 
         style={[styles.circleCheck, item.selectedForDistance && styles.circleCheckSelected]}
         onPress={(e) => {
@@ -225,12 +233,39 @@ export default function TourPlannerScreen() {
     </View>
   );
 
-  // --- Main Layout ---
+  // --- RENDER LOGIC ---
+
+  // 1. Show Intro Screen if active
+  if (showIntro) {
+    return (
+      <View style={styles.splashContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
+        <View style={styles.splashBackground}>
+          <View style={styles.splashContent}>
+             {/* Note: Path assumed to be correct based on previous confirmation */}
+             <Image 
+              source={require('./assets/icon_round.png')} 
+              style={styles.splashLogo} 
+              resizeMode="contain"
+             />
+             <Text style={styles.splashAppName}>Tour Planner</Text>
+          </View>
+          
+          <View style={styles.splashFooterContainer}>
+             <Text style={styles.splashFooterText}>Developed by</Text>
+             <Text style={styles.splashDeveloperName}>Rohan Dutta 💖</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // 2. Show Main App if intro is done
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f766e" />
+      <StatusBar barStyle="light-content" backgroundColor="#1e40af" />
       
-      {/* App Header */}
+      {/* App Header - Solid Blue */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
           ✈️ Tour Planner
@@ -243,9 +278,7 @@ export default function TourPlannerScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Mode Switch Logic */}
       {!isEditMode ? (
-        // --- VIEW MODE ---
         <View style={{flex: 1}}>
           <SectionList
             sections={sections}
@@ -253,22 +286,28 @@ export default function TourPlannerScreen() {
             renderItem={renderItem}
             renderSectionHeader={renderSectionHeader}
             stickySectionHeadersEnabled={true}
-            contentContainerStyle={{paddingBottom: 100}}
+            // CRITICAL FIX: Use insets.bottom to dynamically push content above the bar
+            contentContainerStyle={[
+                styles.listContent, 
+                getSelected().length === 2 && {
+                    paddingBottom: 80 + insets.bottom, // 80px = height of bar + padding
+                }
+            ]}
           />
-
-          {/* Warning Toast */}
+          
+          {/* Warning Toast - Positioned relative to the bottom bar */}
           {warningMsg && (
-            <View style={styles.warningContainer}>
+            <View style={[styles.warningContainer, { bottom: 90 + insets.bottom }]}>
               <Text style={styles.warningText}>⚠️ {warningMsg}</Text>
             </View>
           )}
-
-          {/* Bottom Action Bar */}
+          
+          {/* Bottom Action Bar - Now fixed at the bottom of the screen */}
           {getSelected().length === 2 && (
-            <View style={styles.bottomBar}>
+            <View style={[styles.bottomBar, { paddingBottom: 16 + insets.bottom }]}>
               <TouchableOpacity 
                 onPress={openMaps} 
-                activeOpacity={0.9}
+                activeOpacity={0.8}
                 style={styles.distanceBtn}
               >
                 <Text style={styles.distanceBtnText}>📍 Calculate Distance</Text>
@@ -277,19 +316,18 @@ export default function TourPlannerScreen() {
           )}
         </View>
       ) : (
-        // --- EDIT MODE ---
+        // EDIT MODE
         <KeyboardAvoidingView 
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{flex: 1}}
         >
-          <ScrollView contentContainerStyle={styles.editScroll}>
+          <ScrollView contentContainerStyle={[styles.editScroll, { paddingBottom: 100 + insets.bottom }]}>
             <View style={styles.tipBox}>
               <Text style={styles.tipIcon}>💡</Text>
               <Text style={styles.tipText}>
                 <Text style={{fontWeight: 'bold'}}>Tip:</Text> Change the "Day" number to move destinations.
               </Text>
             </View>
-
             {[...destinations]
               .sort((a, b) => (a.day || 0) - (b.day || 0))
               .map((item) => (
@@ -303,7 +341,6 @@ export default function TourPlannerScreen() {
                     onChangeText={(val) => updateDestination(item.id, 'day', parseInt(val) || 0)}
                   />
                 </View>
-
                 <View style={styles.nameInputWrap}>
                   <Text style={styles.inputLabel}>DESTINATION NAME</Text>
                   <TextInput
@@ -313,7 +350,6 @@ export default function TourPlannerScreen() {
                     placeholder="Enter name"
                   />
                 </View>
-
                 <TouchableOpacity 
                   style={styles.deleteBtn} 
                   onPress={() => deleteDestination(item.id)}
@@ -322,16 +358,12 @@ export default function TourPlannerScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-
             <TouchableOpacity style={styles.addBtn} onPress={addNewDestination}>
               <Text style={styles.addBtnText}>➕ Add Destination</Text>
             </TouchableOpacity>
-
             <View style={{height: 60}} />
           </ScrollView>
-
-          {/* Save Button */}
-          <View style={styles.saveBar}>
+          <View style={[styles.saveBar, { paddingBottom: 16 + insets.bottom }]}>
             <TouchableOpacity 
               style={styles.saveBtn} 
               onPress={() => {
@@ -348,13 +380,65 @@ export default function TourPlannerScreen() {
   );
 }
 
+// --- Main Export (Wrapping the content in the Provider) ---
+export default function TourPlannerScreen() {
+    return (
+        <SafeAreaProvider>
+            <MainAppContent />
+        </SafeAreaProvider>
+    );
+}
+
+
 // --- Styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  // Header
+  // --- Splash Screen Styles ---
+  splashContainer: {
+    flex: 1,
+  },
+  splashBackground: {
+    flex: 1,
+    backgroundColor: '#1e40af', // Solid blue-700
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashContent: {
+    alignItems: 'center',
+    marginBottom: 50,
+  },
+  splashLogo: {
+    width: 120,
+    height: 120,
+    marginBottom: 20,
+    borderRadius: 60,
+  },
+  splashAppName: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 1,
+  },
+  splashFooterContainer: {
+    position: 'absolute',
+    bottom: 50,
+    alignItems: 'center',
+  },
+  splashFooterText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  splashDeveloperName: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  // --- App Header - Blue ---
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -362,7 +446,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingTop: Platform.OS === 'android' ? 40 : 16,
-    backgroundColor: '#012fd7ff',
+    backgroundColor: '#1e40af', // Blue-700
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -377,7 +461,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   editBtn: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#e8e8e8ff',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
@@ -386,6 +470,14 @@ const styles = StyleSheet.create({
     color: '#000000ff',
     fontWeight: '700',
     fontSize: 14,
+  },
+  // --- Content Padding Fixes ---
+  listContent: {
+    paddingBottom: 20, 
+  },
+  listContentWithBar: {
+    // This padding is now dynamically handled within the component using insets.bottom
+    // We keep the name but it's not strictly used here anymore.
   },
   // Section List
   sectionHeader: {
@@ -397,12 +489,12 @@ const styles = StyleSheet.create({
     borderColor: '#f3f4f6',
   },
   sectionHeaderText: {
-    color: '#0f766e',
+    color: '#1e40af', // Blue-700
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
   },
-  // Row Item
+  // Row Item Styles (Skipped for brevity, remain unchanged)
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,8 +525,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#0d9488',
-    borderColor: '#0d9488',
+    backgroundColor: '#10b981', // Green-500
+    borderColor: '#10b981',
   },
   checkmark: {
     color: '#ffffff',
@@ -459,14 +551,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#0d9488',
+    borderColor: '#10b981', // Green-500
     marginLeft: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleCheckSelected: {
-    backgroundColor: '#0d9488',
-    borderColor: '#0f766e',
+    backgroundColor: '#10b981',
+    borderColor: '#059669', // Green-600
   },
   circleDot: {
     width: 8,
@@ -474,16 +566,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#ffffff',
   },
-  // Bottom Bar
+  // Bottom Bar (Fixed)
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    // paddingBottom is now handled dynamically in the component
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: '#e5e7eb',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
@@ -494,39 +588,38 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: '#0d9488',
+    backgroundColor: '#14b8a6', // Teal-500
   },
   distanceBtnText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Warning
+  // Warning - Fixed position, relative to bottom bar
   warningContainer: {
     position: 'absolute',
-    bottom: 90,
+    // bottom positioning is now handled dynamically in the component
     left: 20,
     right: 20,
-    backgroundColor: '#fff7ed', 
-    borderWidth: 1,
-    borderColor: '#fed7aa',
+    backgroundColor: '#1f2937',
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   warningText: {
-    color: '#c2410c', 
+    color: '#ffffff',
     fontWeight: '600',
+    fontSize: 14,
   },
-  // Edit Mode Styles
+  // Edit Mode Styles (Skipped for brevity, remain unchanged)
   editScroll: {
     padding: 20,
-    paddingBottom: 100,
+    // paddingBottom is now handled dynamically in the component
   },
   tipBox: {
     flexDirection: 'row',
@@ -629,11 +722,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   saveBtn: {
-    backgroundColor: '#0f766e', 
+    backgroundColor: '#1e40af', 
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#0f766e',
+    shadowColor: '#1e40af',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,

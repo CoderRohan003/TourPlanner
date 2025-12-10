@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "TourPlanner",
+    "name": "Tour Planner",
     "slug": "TourPlanner",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/icon_round.png",
         "backgroundColor": "#14b8a6"
       },
       "edgeToEdgeEnabled": true,
@@ -26,11 +26,6 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "b58ff78b-4f13-47eb-93c0-76e9258c740d"
-      }
     }
   }
 }
